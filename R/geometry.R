@@ -59,37 +59,40 @@ project_regions <- function(regions_wgs84) {
   }
 }
 
-# Union-Find with path compression.
+# Connected components of the "centroids within max_dist_m" graph.
 # Returns a list of integer-index vectors, one per cluster.
+#
+# The neighbour search is delegated to sf::st_is_within_distance, which uses
+# a spatial index. A pairwise distance loop is O(n^2) and untenable here:
+# a national coastline unions into thousands of polygons (Australia gives
+# ~6,600, i.e. ~22 million pairs).
 .union_find_cluster <- function(polygons, max_dist_m) {
   n <- length(polygons)
   if (n == 1) return(list(1L))
 
-  # Precompute centroids per element — positional extraction avoids dimname
-  # fragility in sf::st_coordinates() across sf versions.
   cents <- suppressWarnings(sf::st_centroid(do.call(sf::st_sfc, polygons)))
-  cx <- vapply(cents, function(p) p[[1]], numeric(1))
-  cy <- vapply(cents, function(p) p[[2]], numeric(1))
+  nb    <- sf::st_is_within_distance(cents, dist = max_dist_m)
 
+  # Union-Find with path halving.
   parent <- seq_len(n)
-
   find_root <- function(x) {
-    while (parent[x] != x) x <- parent[x]
+    while (parent[x] != x) {
+      parent[x] <<- parent[parent[x]]
+      x <- parent[x]
+    }
     x
   }
 
-  for (i in seq_len(n - 1)) {
-    for (j in seq(i + 1, n)) {
-      dist <- sqrt((cx[i] - cx[j])^2 + (cy[i] - cy[j])^2)
-      if (dist <= max_dist_m) {
-        ra <- find_root(i); rb <- find_root(j)
-        if (ra != rb) parent[ra] <- rb
-      }
+  for (i in seq_len(n)) {
+    for (j in nb[[i]]) {
+      if (j <= i) next
+      ra <- find_root(i); rb <- find_root(j)
+      if (ra != rb) parent[ra] <- rb
     }
   }
 
-  roots <- sapply(seq_len(n), find_root)
-  split(seq_len(n), roots)
+  roots <- vapply(seq_len(n), find_root, integer(1))
+  unname(split(seq_len(n), roots))
 }
 
 #' Identify separate landmass clusters from a projected sf data frame

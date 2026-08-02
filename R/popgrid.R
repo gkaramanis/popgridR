@@ -14,21 +14,28 @@
 #' ([fill_gaps()]).
 #'
 #' Rows sharing the same value in `region_col` are treated as one region:
-#' their weights pool and their cells count against one quota.
+#' their weights pool (see `values_agg`) and their cells count against one
+#' quota. Sub-unit polygons therefore need no dissolving beforehand.
 #'
-#' @param regions sf data frame with POLYGON/MULTIPOLYGON geometries in any
-#'   CRS. Geographic (lon/lat) input is auto-projected to a data-centred
-#'   Lambert Azimuthal Equal-Area CRS unless `crs` is given.
+#' @param x sf data frame with POLYGON/MULTIPOLYGON geometries in any CRS.
+#'   Geographic (lon/lat) input is auto-projected to a data-centred Lambert
+#'   Azimuthal Equal-Area CRS unless `crs` is given.
 #' @param values Weights controlling each region's cell share. Either the
-#'   name of a numeric column in `regions`, a named numeric vector keyed by
-#'   `region_col` values, or an unnamed numeric vector aligned with
-#'   `regions` rows.
+#'   name of a numeric column in `x`, a named numeric vector keyed by
+#'   `region_col` values, or an unnamed numeric vector aligned with `x` rows.
 #' @param region_col Name of the column identifying regions. Default
 #'   `"region_name"`.
 #' @param n Total number of cells to allocate. Ignored when
 #'   `value_per_cell` is given.
 #' @param value_per_cell Alternative to `n`: weight units represented by one
 #'   cell (e.g. `50000` for "1 cell = 50 000 trips").
+#' @param values_agg How to pool `values` when several rows share a region.
+#'   `"auto"` (default) sums per-row quantities but takes a value that is
+#'   constant within every multi-row region only once — the case where a
+#'   share or rate has been joined onto sub-unit polygons, where summing
+#'   would inflate regions in proportion to their row count. `"sum"` and
+#'   `"first"` force the behaviour. Ignored when `values` is a named vector,
+#'   which is already per-region.
 #' @param method Deformation method, see [deform_regions()]. Default
 #'   `"auto"`: \pkg{cartogramR}'s `"dcn"` when installed, else `"damped"`.
 #' @param crs Optional CRS (anything `sf::st_crs()` accepts) to project into
@@ -64,11 +71,12 @@
 #'                  verbose = FALSE)
 #' table(cells$region_name)
 #' @export
-popgrid <- function(regions,
+popgrid <- function(x,
                     values,
                     region_col         = "region_name",
                     n                  = 1000L,
                     value_per_cell     = NULL,
+                    values_agg         = c("auto", "sum", "first"),
                     method             = c("auto", "dcn", "gn", "damped", "none"),
                     crs                = NULL,
                     cluster_distance_m = 200000,
@@ -79,22 +87,48 @@ popgrid <- function(regions,
                     topology_passes    = 30L,
                     fill               = TRUE,
                     verbose            = TRUE) {
-  method <- match.arg(method)
+  method     <- match.arg(method)
+  values_agg <- match.arg(values_agg)
 
   # ── Validate input ──────────────────────────────────────────────────────
-  if (!inherits(regions, "sf")) stop("`regions` must be an sf data frame.")
+  if (!inherits(x, "sf")) {
+    stop("`x` must be an sf data frame of region polygons, not ",
+         class(x)[1], ".\n",
+         "  Pass the sf object itself; name its columns with `values` and ",
+         "`region_col`:\n",
+         "    popgrid(my_sf, values = \"weight_col\", region_col = \"name_col\")")
+  }
+  regions <- x
   if (!(region_col %in% names(regions)))
-    stop("Column '", region_col, "' not found in `regions`.")
+    stop("`region_col` = '", region_col, "' is not a column in `x`. ",
+         "Available: ", paste(setdiff(names(regions), attr(regions, "sf_column")),
+                              collapse = ", "))
   if (is.na(sf::st_crs(regions)))
-    stop("`regions` has no CRS. Assign one with sf::st_set_crs() first.")
+    stop("`x` has no CRS. Assign one with sf::st_set_crs() first.")
 
   region_name <- as.character(regions[[region_col]])
   if (anyNA(region_name)) stop("`", region_col, "` contains NA values.")
 
+  # ── Drop rows with no geometry ──────────────────────────────────────────
+  # Statistical boundary files routinely carry placeholder rows (offshore,
+  # migratory, "no usual address") with empty geometry. They cannot be
+  # tiled, and they poison the projection origin, so remove them before
+  # anything else reads the geometry.
+  nonempty <- !sf::st_is_empty(sf::st_geometry(regions))
+  if (!all(nonempty)) {
+    if (verbose)
+      message(sum(!nonempty), " row(s) with empty geometry dropped.")
+    regions     <- regions[nonempty, ]
+    region_name <- region_name[nonempty]
+    if (nrow(regions) == 0) stop("No non-empty geometries in `x`.")
+  }
+
   # ── Resolve values to one numeric per row ───────────────────────────────
   if (is.character(values) && length(values) == 1) {
     if (!(values %in% names(regions)))
-      stop("Values column '", values, "' not found in `regions`.")
+      stop("`values` = '", values, "' is not a column in `x`. ",
+           "Available: ", paste(setdiff(names(regions), attr(regions, "sf_column")),
+                                collapse = ", "))
     vals <- as.numeric(regions[[values]])
   } else if (!is.null(names(values))) {
     missing_nms <- setdiff(unique(region_name), names(values))
@@ -104,22 +138,46 @@ popgrid <- function(regions,
   } else if (is.numeric(values) && length(values) == nrow(regions)) {
     vals <- as.numeric(values)
   } else {
-    stop("`values` must be a column name, a named numeric vector, ",
-         "or an unnamed numeric vector with one value per row.")
+    stop("`values` must be one of:\n",
+         "  - a column name in `x`, e.g. values = \"population\"\n",
+         "  - a named numeric vector keyed by `region_col` values\n",
+         "  - an unnamed numeric vector with one value per row of `x` (",
+         nrow(regions), " needed, got ", length(values), ")")
   }
   if (anyNA(vals)) stop("`values` contains NA for region(s): ",
                         paste(unique(region_name[is.na(vals)]), collapse = ", "))
   if (any(vals < 0)) stop("`values` must be non-negative.")
 
-  # Weights pooled per region name (handles multiple rows per region).
-  # A named vector is a per-region total, so take it once per name;
-  # column/positional values are per-row and sum.
+  # ── Pool weights per region ─────────────────────────────────────────────
+  # Rows sharing a region name pool into one weight. A named vector is
+  # already per-region. For a column or per-row vector, `values_agg` decides:
+  # "auto" sums per-row quantities (populations of sub-units) but takes a
+  # value that is constant within every multi-row region only once (a share
+  # or rate repeated across sub-units), since summing those would inflate
+  # regions in proportion to their row count.
   if (!is.null(names(values)) && !is.character(values)) {
-    weights <- values[unique(region_name)]
-    weights <- setNames(as.numeric(weights), unique(region_name))
+    weights <- setNames(as.numeric(values[unique(region_name)]),
+                        unique(region_name))
   } else {
-    w       <- tapply(vals, region_name, sum)
+    grp       <- split(vals, region_name)
+    multi_row <- any(lengths(grp) > 1L)
+    constant  <- all(vapply(grp, function(v) length(unique(v)) == 1L, logical(1)))
+
+    agg <- values_agg
+    if (agg == "auto") agg <- if (multi_row && constant) "first" else "sum"
+
+    w <- vapply(grp, if (agg == "first") function(v) v[[1]] else sum, numeric(1))
     weights <- setNames(as.numeric(w), names(w))
+
+    if (verbose && multi_row) {
+      message(sprintf(
+        "%d rows pooled into %d regions by `%s`; values %s.",
+        nrow(regions), length(weights), region_col,
+        if (agg == "first")
+          "constant within each region, taken once (values_agg = \"sum\" to add them)"
+        else "summed per region"
+      ))
+    }
   }
 
   # ── Cell count ──────────────────────────────────────────────────────────

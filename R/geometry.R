@@ -31,8 +31,10 @@ project_regions <- function(regions_wgs84) {
       (bb["ymin"] + bb["ymax"]) / 2)
   }))
 
-  lon_0 <- stats::median(poly_bounds[, 1])
-  lat_0 <- stats::median(poly_bounds[, 2])
+  lon_0 <- stats::median(poly_bounds[, 1], na.rm = TRUE)
+  lat_0 <- stats::median(poly_bounds[, 2], na.rm = TRUE)
+  if (is.na(lon_0) || is.na(lat_0))
+    stop("Cannot derive a projection origin - all geometries are empty.")
 
   crs       <- laea_crs(lon_0, lat_0)
   projected <- sf::st_transform(regions_wgs84, crs)

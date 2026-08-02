@@ -8,6 +8,14 @@
 \description{
 Generate mosaic (block) cartograms: a set of regions is deformed so that area is proportional to a numeric weight, then rasterised into equal-area square cells, with each region receiving a cell count fixed by largest-remainder (Hamilton) allocation. Works with any 'sf' polygon input and any numeric weight (population, trips, GDP, ...). Deformation can use 'cartogramR' (Dougenik et al. 1985 \doi{10.1111/j.0033-0124.1985.00075.x}; Gastner and Newman 2004 \doi{10.1073/pnas.0400280101}) or a built-in dependency-free damped Dougenik implementation. Post-processing enforces exact per-region cell counts, repairs adjacency against true geography, and fills interior gaps. R port and generalisation of the 'popgrid' 'Python' package.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/gkaramanis/popgridR}
+  \item Report bugs at \url{https://github.com/gkaramanis/popgridR/issues}
+}
+
+}
 \author{
 \strong{Maintainer}: Georgios Karamanis \email{claude@karaman.is}
 

@@ -5,11 +5,12 @@
 \title{Build a mosaic (block) cartogram}
 \usage{
 popgrid(
-  regions,
+  x,
   values,
   region_col = "region_name",
   n = 1000L,
   value_per_cell = NULL,
+  values_agg = c("auto", "sum", "first"),
   method = c("auto", "dcn", "gn", "damped", "none"),
   crs = NULL,
   cluster_distance_m = 2e+05,
@@ -23,14 +24,13 @@ popgrid(
 )
 }
 \arguments{
-\item{regions}{sf data frame with POLYGON/MULTIPOLYGON geometries in any
-CRS. Geographic (lon/lat) input is auto-projected to a data-centred
-Lambert Azimuthal Equal-Area CRS unless \code{crs} is given.}
+\item{x}{sf data frame with POLYGON/MULTIPOLYGON geometries in any CRS.
+Geographic (lon/lat) input is auto-projected to a data-centred Lambert
+Azimuthal Equal-Area CRS unless \code{crs} is given.}
 
 \item{values}{Weights controlling each region's cell share. Either the
-name of a numeric column in \code{regions}, a named numeric vector keyed by
-\code{region_col} values, or an unnamed numeric vector aligned with
-\code{regions} rows.}
+name of a numeric column in \code{x}, a named numeric vector keyed by
+\code{region_col} values, or an unnamed numeric vector aligned with \code{x} rows.}
 
 \item{region_col}{Name of the column identifying regions. Default
 \code{"region_name"}.}
@@ -40,6 +40,14 @@ name of a numeric column in \code{regions}, a named numeric vector keyed by
 
 \item{value_per_cell}{Alternative to \code{n}: weight units represented by one
 cell (e.g. \code{50000} for "1 cell = 50 000 trips").}
+
+\item{values_agg}{How to pool \code{values} when several rows share a region.
+\code{"auto"} (default) sums per-row quantities but takes a value that is
+constant within every multi-row region only once — the case where a
+share or rate has been joined onto sub-unit polygons, where summing
+would inflate regions in proportion to their row count. \code{"sum"} and
+\code{"first"} force the behaviour. Ignored when \code{values} is a named vector,
+which is already per-region.}
 
 \item{method}{Deformation method, see \code{\link[=deform_regions]{deform_regions()}}. Default
 \code{"auto"}: \pkg{cartogramR}'s \code{"dcn"} when installed, else \code{"damped"}.}
@@ -87,7 +95,8 @@ repair adjacency (\code{\link[=enforce_topology]{enforce_topology()}}) -> fill i
 (\code{\link[=fill_gaps]{fill_gaps()}}).
 
 Rows sharing the same value in \code{region_col} are treated as one region:
-their weights pool and their cells count against one quota.
+their weights pool (see \code{values_agg}) and their cells count against one
+quota. Sub-unit polygons therefore need no dissolving beforehand.
 }
 \examples{
 # Four synthetic regions in a projected CRS

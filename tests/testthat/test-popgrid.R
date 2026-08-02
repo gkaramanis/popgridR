@@ -67,8 +67,43 @@ test_that("missing values fail loudly", {
   )
   expect_error(
     popgrid(regions, values = "nope", region_col = "name", n = 10L),
-    "not found"
+    "not a column in"
   )
+  expect_error(popgrid(regions$name, values = 1:4), "must be an sf data frame")
+})
+
+test_that("a value constant within multi-row regions is not summed", {
+  regions <- make_regions()
+  regions$name  <- c("A", "A", "B", "B")
+  regions$share <- c(0.7, 0.7, 0.3, 0.3)   # per-region share repeated per row
+
+  auto <- popgrid(regions, values = "share", region_col = "name",
+                  n = 100L, method = "damped", verbose = FALSE)
+  expect_equal(unname(attr(auto, "quotas")[["A"]]), 70L)
+
+  # forcing sum double-counts both regions; here they scale equally
+  summed <- popgrid(regions, values = "share", region_col = "name",
+                    n = 100L, values_agg = "sum", method = "damped",
+                    verbose = FALSE)
+  expect_equal(unname(attr(summed, "quotas")[["A"]]), 70L)
+
+  # per-row quantities that differ within a region are still summed
+  regions$pop <- c(40, 30, 20, 10)
+  q <- attr(popgrid(regions, values = "pop", region_col = "name", n = 100L,
+                    method = "damped", verbose = FALSE), "quotas")
+  expect_equal(unname(q[["A"]]), 70L)
+})
+
+test_that("empty geometries are dropped", {
+  regions <- make_regions()
+  empty   <- regions[1, ]
+  sf::st_geometry(empty) <- sf::st_sfc(sf::st_polygon(), crs = 3857)
+  empty$name <- "E"; empty$w <- 5
+  regions <- rbind(regions, empty)
+
+  cells <- popgrid(regions, values = "w", region_col = "name",
+                   n = 50L, method = "damped", verbose = FALSE)
+  expect_false("E" %in% cells$region_name)
 })
 
 test_that("method = none tiles undeformed geometry", {

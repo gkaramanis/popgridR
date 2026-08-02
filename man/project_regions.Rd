@@ -14,6 +14,6 @@ Named list: \code{regions} (projected sf) and \code{crs} (the LAEA crs object).
 }
 \description{
 Uses the median of each polygon's bbox centre as the projection origin,
-so a single large outlying territory (e.g. Alaska) doesn't pull the centre
-away from the main inhabited area.
+so a single large outlying territory doesn't pull the centre away from the
+main body of the data.
 }

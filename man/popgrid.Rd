@@ -39,7 +39,7 @@ name of a numeric column in \code{x}, a named numeric vector keyed by
 \code{value_per_cell} is given.}
 
 \item{value_per_cell}{Alternative to \code{n}: weight units represented by one
-cell (e.g. \code{50000} for "1 cell = 50 000 trips").}
+cell (e.g. \code{50000} for one cell per 50 000 units of \code{values}).}
 
 \item{values_agg}{How to pool \code{values} when several rows share a region.
 \code{"auto"} (default) sums per-row quantities but takes a value that is

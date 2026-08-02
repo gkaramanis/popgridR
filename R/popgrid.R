@@ -28,7 +28,7 @@
 #' @param n Total number of cells to allocate. Ignored when
 #'   `value_per_cell` is given.
 #' @param value_per_cell Alternative to `n`: weight units represented by one
-#'   cell (e.g. `50000` for "1 cell = 50 000 trips").
+#'   cell (e.g. `50000` for one cell per 50 000 units of `values`).
 #' @param values_agg How to pool `values` when several rows share a region.
 #'   `"auto"` (default) sums per-row quantities but takes a value that is
 #'   constant within every multi-row region only once — the case where a
@@ -211,11 +211,23 @@ popgrid <- function(x,
 
   # ── Quotas ──────────────────────────────────────────────────────────────
   quotas <- hamilton_quotas(weights, n)
-  if (verbose) {
-    zero <- names(quotas)[quotas == 0]
-    if (length(zero) > 0)
-      message("Regions with 0 cells at n = ", n, ": ",
-              paste(zero, collapse = ", "))
+
+  # Regions too small to earn a single cell are removed outright. They can
+  # never be drawn, and their extreme weight-to-area ratio destabilises the
+  # cartogram force field.
+  zero <- names(quotas)[quotas < 1]
+  if (length(zero) > 0) {
+    if (verbose)
+      message("Dropping ", length(zero), " zero-cell region(s) at n = ", n,
+              ": ", paste(zero, collapse = ", "))
+    keep_z       <- !(region_name %in% zero)
+    regions_proj <- regions_proj[keep_z, ]
+    region_name  <- region_name[keep_z]
+    vals         <- vals[keep_z]
+    quotas       <- quotas[!(names(quotas) %in% zero)]
+    if (nrow(regions_proj) == 0)
+      stop("No region earns a cell at n = ", n, "; increase `n`.")
+    regions_proj$region_id <- match(region_name, unique(region_name)) - 1L
   }
 
   # ── Landmasses & adjacency ──────────────────────────────────────────────
@@ -236,12 +248,23 @@ popgrid <- function(x,
   cell_size  <- cell_size_for_n(total_area, n)
 
   # ── Per landmass: scale -> deform -> rasterise ──────────────────────────
-  cell_frames <- lapply(landmasses, function(lm) {
+  # The mainland (largest landmass) frame is recorded before and after
+  # deformation so detached landmasses can be re-anchored to it afterwards.
+  mainland_id <- landmasses[[1]]$id
+  geo_bbox    <- NULL
+  def_bbox    <- NULL
+  cell_frames <- vector("list", length(landmasses))
+
+  for (li in seq_along(landmasses)) {
+    lm         <- landmasses[[li]]
     lm_regions <- regions_proj[lm$region_idx, ]
     lm_vals    <- vals[lm$region_idx]
 
     lm_quota_total <- sum(quotas[unique(lm_regions$region_name)], na.rm = TRUE)
-    if (lm_quota_total == 0) return(NULL)  # too small for any cell at this n
+    if (lm_quota_total == 0 || nrow(lm_regions) == 0) next
+
+    if (lm$id == mainland_id)
+      geo_bbox <- as.numeric(sf::st_bbox(lm_regions))
 
     # Target area = quota-weighted share of total (x oversize for perimeter loss)
     target_area <- lm_quota_total / n * total_area * oversize
@@ -258,9 +281,13 @@ popgrid <- function(x,
       lm_scaled  # single region: scaling is enough
     }
 
+    if (lm$id == mainland_id)
+      def_bbox <- as.numeric(sf::st_bbox(lm_deformed))
+
     lm_union <- sf::st_union(sf::st_geometry(lm_deformed))[[1]]
-    generate_cells(lm_union, lm_deformed, cell_size, lm$id)
-  })
+    lm_union <- .fill_outline_holes(lm_union)
+    cell_frames[[li]] <- generate_cells(lm_union, lm_deformed, cell_size, lm$id)
+  }
 
   cells <- do.call(rbind, Filter(Negate(is.null), cell_frames))
   if (is.null(cells) || nrow(cells) == 0)
@@ -272,6 +299,15 @@ popgrid <- function(x,
   cells <- enforce_topology(cells, real_adj, as.list(quotas), cell_size,
                             passes = topology_passes)
   if (fill) cells <- fill_gaps(cells, cell_size)
+
+  # ── Landmass layout ─────────────────────────────────────────────────────
+  # Detached landmasses were scaled and rasterised at their own geographic
+  # positions; re-anchor them into the deformed mainland's frame, then put
+  # every block on one lattice.
+  if (!is.null(geo_bbox) && !is.null(def_bbox))
+    cells <- .reanchor_secondary(cells, mainland_id, geo_bbox, def_bbox, cell_size)
+  cells <- .snap_to_lattice(cells, mainland_id, cell_size)
+
   if (verbose) message(nrow(cells), " cells after post-processing.")
 
   if (region_col != "region_name") cells[[region_col]] <- cells$region_name

@@ -17,8 +17,8 @@ laea_crs <- function(lon_0, lat_0) {
 #' Reproject a geographic sf data frame to a data-centred LAEA CRS
 #'
 #' Uses the median of each polygon's bbox centre as the projection origin,
-#' so a single large outlying territory (e.g. Alaska) doesn't pull the centre
-#' away from the main inhabited area.
+#' so a single large outlying territory doesn't pull the centre away from the
+#' main body of the data.
 #'
 #' @param regions_wgs84 sf data frame in a geographic (lon/lat) CRS.
 #' @return Named list: `regions` (projected sf) and `crs` (the LAEA crs object).
@@ -64,8 +64,8 @@ project_regions <- function(regions_wgs84) {
 #
 # The neighbour search is delegated to sf::st_is_within_distance, which uses
 # a spatial index. A pairwise distance loop is O(n^2) and untenable here:
-# a national coastline unions into thousands of polygons (Australia gives
-# ~6,600, i.e. ~22 million pairs).
+# a full-resolution national coastline unions into thousands of polygons,
+# i.e. tens of millions of pairs.
 .union_find_cluster <- function(polygons, max_dist_m) {
   n <- length(polygons)
   if (n == 1) return(list(1L))

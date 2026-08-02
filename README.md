@@ -95,8 +95,6 @@ ggplot(cells) +
     subtitle = sprintf("1 cell ~ %.0f people | %d cells total",
                        attr(cells, "value_per_cell"), nrow(cells))
   )
-
-ggsave("man/figures/greece.png", width = 9, height = 7, dpi = 150)
 ```
 
 ![Mosaic cartogram of Greece: 1000 square cells, one per ~10,500 people, coloured by region](man/figures/greece.png)

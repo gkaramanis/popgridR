@@ -135,47 +135,27 @@ Every step is exported (`project_regions()`, `detect_landmasses()`,
 
 ## Input data
 
-Any `sf` polygon data frame works, but two properties of the input matter a
-lot in practice.
+Any `sf` polygon data frame works. Three properties of the input affect the
+result:
 
-**Resolution.** Generalised boundaries (Natural Earth) union into tens of
-polygons; official statistical boundaries at survey resolution union into
-thousands, nearly all of them sub-square-kilometre islets that cannot
-receive a cell. Dropping them first is worth it:
-
-```r
-regions <- regions |>
-  dplyr::filter(!sf::st_is_empty(geometry)) |>
-  sf::st_cast("MULTIPOLYGON") |>   # normalise before casting to POLYGON
-  sf::st_cast("POLYGON") |>
-  dplyr::filter(as.numeric(sf::st_area(geometry)) > 1e6) |>
-  dplyr::group_by(region) |>
-  dplyr::summarise(.groups = "drop")
-```
-
-The `st_cast("MULTIPOLYGON")` step is required: casting a column that mixes
-POLYGON and MULTIPOLYGON straight to POLYGON silently keeps only each
-feature's first part.
-
-**Sub-units sharing a region name.** Rows sharing a value in `region_col`
-pool into one region, so sub-unit polygons need no dissolving. A weight that
-is constant within a region (a share or rate joined onto sub-units) is taken
-once rather than summed; see `values_agg`.
-
-**Remote territories** are placed at their real position relative to the
-mainland, which can leave a single cell thousands of kilometres out and
-stretch the plot. Filter them out before building if you don't want them.
+- **Geometric detail.** Runtime scales with the number of polygon parts, not
+  the number of regions. Highly detailed coastlines contribute many parts too
+  small to receive a cell; discarding them before building costs nothing
+  visually and saves a great deal of time.
+- **Rows per region.** Rows sharing a value in `region_col` pool into one
+  region, so sub-units need no dissolving. A weight held constant across a
+  region's rows is taken once rather than summed; see `values_agg`.
+- **Detached territories.** These are positioned relative to the mainland
+  rather than collected into an inset, so a distant one can sit far outside
+  the main extent. Filter it out beforehand if that is not wanted.
 
 ## Limitations
 
 - **Speed.** `fit_quota()` and `enforce_topology()` index the cell lattice
   with character keys and linear scans, where the Python original uses hash
   lookups. Cost grows sharply with `n` and with the number of regions.
-  Full-resolution national boundaries at `n = 1000` are impractical; reduce
-  `n`, or simplify the input as above.
-- **Nested enclaves.** Regions fully enclosed by another (a capital city
-  inside its surrounding region) constrain topology repair heavily, and it
-  may exhaust `topology_passes` without converging.
+- **Nested enclaves.** A region fully enclosed by another constrains topology
+  repair heavily, and it may exhaust `topology_passes` without converging.
 - **`cartogramR`'s `gsm` method is not exposed**, only `dcn` and `gn`.
 
 ## References

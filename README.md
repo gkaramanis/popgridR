@@ -7,7 +7,8 @@ cells. Each region receives an exact cell count set by Hamilton
 number of weight units (people, trips, euros).
 
 popgridR is an R port of the Python package
-[popgrid](https://github.com/databites-tech/popgrid) by databites-tech,
+[popgrid](https://github.com/databites-tech/popgrid) by
+[Josep Ferrer](https://github.com/iamjosepferrer),
 generalised to accept any `sf` polygon input and any numeric weight instead
 of country codes with bundled population data. The port was written largely
 with Claude Code.
@@ -135,4 +136,5 @@ Every step is exported (`project_regions()`, `detect_landmasses()`,
 - Gastner, M. T., & Newman, M. E. J. (2004). Diffusion-based method for
   producing density-equalizing maps. *PNAS*, 101(20), 7499–7504.
 - Original Python implementation:
-  [databites-tech/popgrid](https://github.com/databites-tech/popgrid).
+  [databites-tech/popgrid](https://github.com/databites-tech/popgrid) by
+  [Josep Ferrer](https://github.com/iamjosepferrer).

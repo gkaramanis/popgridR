@@ -50,9 +50,55 @@ attr(cells, "value_per_cell")
 attr(cells, "quotas")
 ```
 
-Admin-1 boundaries can be fetched with the optional helper
-`load_country_regions("GRC")` (requires rnaturalearth). A full worked
-example is in `inst/examples/greece.R`.
+## Example: Greece population grid
+
+Admin-1 boundaries fetched with the bundled helper (requires
+rnaturalearth); population figures from the 2021 ELSTAT census. Also in
+`inst/examples/greece.R`.
+
+```r
+library(popgridR)
+library(ggplot2)
+
+# Natural Earth's admin-1 `name` column already is the 13 Greek peripheries.
+regions <- load_country_regions("GRC")
+
+# Mount Athos is counted separately by ELSTAT and too small to earn a cell
+# at n = 1000 - drop it for a clean 13-region map.
+regions <- regions[regions$region_name != "Mount Athos", ]
+
+population <- c(
+  "Attica"                    = 3814064,
+  "Central Macedonia"         = 1795669,
+  "Thessaly"                  =  688255,
+  "West Greece"               =  643449,
+  "Crete"                     =  624408,
+  "East Macedonia and Thrace" =  562201,
+  "Peloponnese"               =  539535,
+  "Central Greece"            =  508254,
+  "Epirus"                    =  319991,
+  "South Aegean"              =  309015,
+  "West Macedonia"            =  254595,
+  "Ionian Islands"            =  204532,
+  "North Aegean"              =  194943
+)
+
+cells <- popgrid(regions, values = population, n = 1000)
+
+ggplot(cells) +
+  geom_sf(aes(fill = region_name), color = NA) +
+  theme_void() +
+  theme(legend.position = "right", legend.title = element_blank()) +
+  labs(
+    title    = "Greece - population grid",
+    subtitle = sprintf("1 cell ~ %.0f people | %d cells total",
+                       attr(cells, "value_per_cell"), nrow(cells))
+  )
+
+ggsave("man/figures/greece.png", width = 9, height = 7, dpi = 150)
+```
+
+![Mosaic cartogram of Greece: 1000 square cells, one per ~10,500 people, coloured by region](man/figures/greece.png)
 
 ## Deformation methods
 

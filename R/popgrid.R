@@ -43,6 +43,12 @@
 #'   recommended.
 #' @param cluster_distance_m Polygons whose centroids are within this
 #'   distance (metres) cluster into one landmass. Default 200 km.
+#' @param simplify Simplify the input before the geometry-heavy stages.
+#'   `FALSE` (default), `TRUE` for a tolerance of `cell_size / 50` — well
+#'   below the resolution any cell can represent — or a number giving the
+#'   tolerance in projected units. Worth enabling for full-resolution
+#'   boundary files, where runtime is dominated by vertex count; on already
+#'   generalised boundaries it only adds the cost of the simplify pass.
 #' @param oversize Pre-rasterisation area multiplier compensating perimeter
 #'   cell losses. Default 1.18.
 #' @param iterations,max_step_fraction Tuning for `method = "damped"`, see
@@ -80,6 +86,7 @@ popgrid <- function(x,
                     method             = c("auto", "dcn", "gn", "damped", "none"),
                     crs                = NULL,
                     cluster_distance_m = 200000,
+                    simplify           = FALSE,
                     oversize           = 1.18,
                     iterations         = 20L,
                     max_step_fraction  = 0.35,
@@ -230,6 +237,35 @@ popgrid <- function(x,
     regions_proj$region_id <- match(region_name, unique(region_name)) - 1L
   }
 
+  # ── Cell size ───────────────────────────────────────────────────────────
+  total_area <- sum(as.numeric(sf::st_area(regions_proj)))
+  cell_size  <- cell_size_for_n(total_area, n)
+
+  # ── Simplify ────────────────────────────────────────────────────────────
+  # Every remaining stage is bound by vertex count, not region count, and
+  # detail far below one cell cannot change which cell belongs to which
+  # region. Simplifying once here is the single largest speed factor on
+  # full-resolution boundaries.
+  if (!isFALSE(simplify)) {
+    tol <- if (isTRUE(simplify)) cell_size / 50 else as.numeric(simplify)
+    if (tol > 0) {
+      simplified <- sf::st_make_valid(sf::st_simplify(
+        sf::st_geometry(regions_proj), dTolerance = tol, preserveTopology = TRUE
+      ))
+      ok <- !sf::st_is_empty(simplified)
+      if (all(ok)) {
+        sf::st_geometry(regions_proj) <- simplified
+        total_area <- sum(as.numeric(sf::st_area(regions_proj)))
+        if (verbose)
+          message("Simplified at ", format(round(tol), big.mark = ","),
+                  " m (1/50 of a cell).")
+      } else if (verbose) {
+        message("Simplification emptied ", sum(!ok),
+                " geometry/geometries - skipped.")
+      }
+    }
+  }
+
   # ── Landmasses & adjacency ──────────────────────────────────────────────
   landmasses <- detect_landmasses(regions_proj, cluster_distance_m)
   if (verbose) message(length(landmasses), " landmass(es) detected.")
@@ -243,9 +279,6 @@ popgrid <- function(x,
             ". Consider a larger `cluster_distance_m`.")
 
   real_adj <- real_adjacency(regions_proj)
-
-  total_area <- sum(as.numeric(sf::st_area(regions_proj)))
-  cell_size  <- cell_size_for_n(total_area, n)
 
   # ── Per landmass: scale -> deform -> rasterise ──────────────────────────
   # The mainland (largest landmass) frame is recorded before and after

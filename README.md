@@ -151,12 +151,16 @@ result:
 
 ## Limitations
 
-- **Speed.** `fit_quota()` and `enforce_topology()` index the cell lattice
-  with character keys and linear scans, where the Python original uses hash
-  lookups. Cost grows sharply with `n` and with the number of regions.
+- **Speed on detailed geometry.** Runtime is dominated by GEOS operations
+  and scales with vertex count, not with `n`: landmass detection, adjacency
+  and deformation all slow down sharply on full-resolution boundary files.
+  Generalised boundaries are fast (Greece at `n = 1000` takes about three
+  seconds); official statistical boundaries can take minutes. `simplify =
+  TRUE` helps in that case and is not worth it otherwise.
 - **Nested enclaves.** A region fully enclosed by another constrains topology
   repair heavily, and it may exhaust `topology_passes` without converging.
 - **`cartogramR`'s `gsm` method is not exposed**, only `dcn` and `gn`.
+- The Python original remains substantially faster on the same input.
 
 ## References
 

@@ -14,6 +14,7 @@ popgrid(
   method = c("auto", "dcn", "gn", "damped", "none"),
   crs = NULL,
   cluster_distance_m = 2e+05,
+  simplify = FALSE,
   oversize = 1.18,
   iterations = 20L,
   max_step_fraction = 0.35,
@@ -58,6 +59,13 @@ recommended.}
 
 \item{cluster_distance_m}{Polygons whose centroids are within this
 distance (metres) cluster into one landmass. Default 200 km.}
+
+\item{simplify}{Simplify the input before the geometry-heavy stages.
+\code{FALSE} (default), \code{TRUE} for a tolerance of \code{cell_size / 50} — well
+below the resolution any cell can represent — or a number giving the
+tolerance in projected units. Worth enabling for full-resolution
+boundary files, where runtime is dominated by vertex count; on already
+generalised boundaries it only adds the cost of the simplify pass.}
 
 \item{oversize}{Pre-rasterisation area multiplier compensating perimeter
 cell losses. Default 1.18.}

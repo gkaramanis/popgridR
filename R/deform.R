@@ -1,6 +1,6 @@
 # Cartogram deformation: pluggable methods behind deform_regions().
 #
-# "dcn" / "gn"  -> cartogramR (C implementation; Suggests)
+# "dcn" / "gn" / "gsm" -> cartogramR (C implementation; Suggests)
 # "damped"      -> built-in pure-R Dougenik with per-iteration mass clamping
 # "none"        -> pass-through (geometry already deformed by the caller)
 
@@ -177,24 +177,26 @@ dougenik_cartogram <- function(gdf,
 
 #' Deform region polygons so area becomes proportional to values
 #'
-#' Dispatcher over the available cartogram implementations. `"dcn"` and
-#' `"gn"` require the suggested \pkg{cartogramR} package; `"damped"` is the
+#' Dispatcher over the available cartogram implementations. `"dcn"`, `"gn"`
+#' and `"gsm"` require the suggested \pkg{cartogramR} package; `"damped"` is the
 #' built-in pure-R fallback; `"none"` returns the input unchanged. `"auto"`
 #' picks `"dcn"` when \pkg{cartogramR} is installed, else `"damped"`.
 #'
 #' @param gdf Projected sf data frame with polygon/multipolygon geometries.
 #' @param values Numeric vector of weights, one per row of `gdf`.
-#' @param method One of `"auto"`, `"dcn"`, `"gn"`, `"damped"`, `"none"`.
+#' @param method One of `"auto"`, `"dcn"`, `"gn"`, `"gsm"`, `"damped"`,
+#'   `"none"`. `"gn"` is Gastner and Newman's diffusion method and `"gsm"` its
+#'   faster flow-based successor (Gastner, Seguy and More 2018).
 #' @param iterations,max_step_fraction Passed to [dougenik_cartogram()]
 #'   (`"damped"` method only).
 #' @param options Named list passed to `cartogramR::cartogramR()`'s `options`
-#'   argument (`"dcn"`/`"gn"` only).
+#'   argument (`"dcn"`, `"gn"` and `"gsm"` only).
 #' @param verbose Print progress messages.
 #' @return Copy of `gdf` with deformed geometries.
 #' @export
 deform_regions <- function(gdf,
                            values,
-                           method            = c("auto", "dcn", "gn", "damped", "none"),
+                           method            = c("auto", "dcn", "gn", "gsm", "damped", "none"),
                            iterations        = 20L,
                            max_step_fraction = 0.35,
                            options           = NULL,
@@ -216,7 +218,7 @@ deform_regions <- function(gdf,
                               verbose           = verbose))
   }
 
-  # dcn / gn via cartogramR
+  # dcn / gn / gsm via cartogramR
   if (!requireNamespace("cartogramR", quietly = TRUE)) {
     stop("method = \"", method, "\" requires the 'cartogramR' package. ",
          "Install it or use method = \"damped\".")

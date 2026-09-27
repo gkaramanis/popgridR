@@ -113,6 +113,7 @@ The `method` argument selects the cartogram backend:
 | `"auto"`   | `"dcn"` if cartogramR is installed, else `"damped"` | default                     |
 | `"dcn"`    | cartogramR (Dougenik et al. 1985, C) | fast, converges fully                        |
 | `"gn"`     | cartogramR (Gastner–Newman 2004, C)  | better behaved on extreme area/weight ratios |
+| `"gsm"`    | cartogramR (Gastner–Seguy–More 2018, C) | flow-based successor to `"gn"`, faster   |
 | `"damped"` | built-in pure R Dougenik             | no compiled dependency; mass clamped per iteration for stability |
 | `"none"`   | pass-through                         | input geometry is used as-is                 |
 
@@ -159,7 +160,6 @@ result:
   TRUE` helps in that case and is not worth it otherwise.
 - **Nested enclaves.** A region fully enclosed by another constrains topology
   repair heavily, and it may exhaust `topology_passes` without converging.
-- **`cartogramR`'s `gsm` method is not exposed**, only `dcn` and `gn`.
 - The Python original remains substantially faster on the same input.
 
 ## References

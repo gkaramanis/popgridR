@@ -54,7 +54,7 @@
 #' @param iterations,max_step_fraction Tuning for `method = "damped"`, see
 #'   [dougenik_cartogram()].
 #' @param deform_options Named list forwarded to
-#'   `cartogramR::cartogramR(options = )` for `method = "dcn"`/`"gn"`.
+#'   `cartogramR::cartogramR(options = )` for `method = "dcn"`, `"gn"` or `"gsm"`.
 #' @param topology_passes Maximum repair passes in [enforce_topology()].
 #' @param fill Run [fill_gaps()] after topology repair. Default TRUE.
 #' @param verbose Print progress messages.
@@ -83,7 +83,7 @@ popgrid <- function(x,
                     n                  = 1000L,
                     value_per_cell     = NULL,
                     values_agg         = c("auto", "sum", "first"),
-                    method             = c("auto", "dcn", "gn", "damped", "none"),
+                    method             = c("auto", "dcn", "gn", "gsm", "damped", "none"),
                     crs                = NULL,
                     cluster_distance_m = 200000,
                     simplify           = FALSE,

@@ -106,7 +106,7 @@ blocks <- aggregate(cells["region_name"], by = list(region = cells$region_name),
 
 ggplot(cells) +
   geom_sf(aes(fill = region_name), color = "white", linewidth = 0.1) +
-  ggrepel::geom_text_repel(data = blocks, aes(label = region, geometry = geometry), stat = "sf_coordinates", fun.geometry = sf::st_point_on_surface, size = 3, bg.color = "white", bg.r = 0.15, min.segment.length = 0, seed = 1) +
+  ggrepel::geom_text_repel(data = blocks, aes(label = region, geometry = geometry), stat = "sf_coordinates", fun.geometry = sf::st_point_on_surface, size = 4, bg.color = "white", bg.r = 0.15, min.segment.length = Inf, point.size = NA, box.padding = 0.1, seed = 1) +
   scale_fill_manual(values = region_colour, guide = "none") +
   theme_void() +
   labs(

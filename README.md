@@ -51,7 +51,7 @@ attr(cells, "quotas")
 ## Example: Greece
 
 The boundaries come from Natural Earth through `load_country_regions()`,
-which needs rnaturalearth. The population figures are from the 2021 ELSTAT
+which needs rnaturalearth. The plot also uses ggrepel and RColorBrewer. The population figures are from the 2021 ELSTAT
 census. The same script is in `inst/examples/greece.R`.
 
 ```r
@@ -82,18 +82,41 @@ population <- c(
 
 cells <- popgrid(regions, values = population, n = 1000)
 
+# Five ColorBrewer Set2 colours, assigned by hand so that no two
+# neighbouring regions share one. Labels name the regions.
+set2 <- RColorBrewer::brewer.pal(5, "Set2")
+
+region_colour <- c(
+  "Thessaly"                  = set2[1],
+  "East Macedonia and Thrace" = set2[1],
+  "Peloponnese"               = set2[1],
+  "Central Greece"            = set2[2],
+  "Epirus"                    = set2[2],
+  "South Aegean"              = set2[2],
+  "West Greece"               = set2[3],
+  "West Macedonia"            = set2[3],
+  "Crete"                     = set2[3],
+  "Central Macedonia"         = set2[4],
+  "Attica"                    = set2[4],
+  "Ionian Islands"            = set2[5],
+  "North Aegean"              = set2[5]
+)
+
+blocks <- aggregate(cells["region_name"], by = list(region = cells$region_name), FUN = \(x) x[1])
+
 ggplot(cells) +
-  geom_sf(aes(fill = region_name), color = NA) +
+  geom_sf(aes(fill = region_name), color = "white", linewidth = 0.1) +
+  ggrepel::geom_text_repel(data = blocks, aes(label = region, geometry = geometry), stat = "sf_coordinates", fun.geometry = sf::st_point_on_surface, size = 3, bg.color = "white", bg.r = 0.15, min.segment.length = 0, seed = 1) +
+  scale_fill_manual(values = region_colour, guide = "none") +
   theme_void() +
-  theme(legend.position = "right", legend.title = element_blank()) +
   labs(
     title    = "Greece - population grid",
-    subtitle = sprintf("1 cell ~ %.0f people | %d cells total",
+    subtitle = sprintf("1 cell ~ %.0f people  |  %d cells total",
                        attr(cells, "value_per_cell"), nrow(cells))
   )
 ```
 
-![Mosaic cartogram of Greece: 1000 square cells, one per ~10,500 people, coloured by region](man/figures/greece.png)
+![Mosaic cartogram of Greece: 1000 square cells, one per ~10,500 people, in five colours with no two neighbouring regions alike, each region labelled](man/figures/greece.png)
 
 ## Deformation methods
 

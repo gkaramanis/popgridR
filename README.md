@@ -1,31 +1,34 @@
 # popgridR
 
-Mosaic (block) cartograms in R: regions are deformed so that area is
-proportional to a numeric weight, then rasterised into equal-area square
-cells. Each region receives an exact cell count set by Hamilton
-(largest-remainder) allocation, so one cell always represents the same
-number of weight units (people, trips, euros).
+popgridR draws mosaic cartograms: maps made of equal squares, where each
+region gets as many squares as its weight calls for. A region with twice the
+population gets twice the squares, and every square stands for the same
+amount (people, trips, euros).
 
-popgridR is an R port of the Python package
-[popgrid](https://github.com/databites-tech/popgrid) by
-[Josep Ferrer](https://github.com/iamjosepferrer),
-generalised to accept any `sf` polygon input and any numeric weight instead
-of country codes with bundled population data. The port was written largely
+It works in two steps. First the regions are deformed so their areas match
+their weights, then they are filled with square cells. The number of cells
+per region is fixed in advance with Hamilton (largest-remainder) allocation,
+so the counts are exact even when the shapes are not.
+
+It is an R port of [popgrid](https://github.com/databites-tech/popgrid), a
+Python package by [Josep Ferrer](https://github.com/iamjosepferrer). The
+Python version takes a country code and uses its own population data. This
+one takes any `sf` polygons and any numeric column. I wrote the port largely
 with Claude Code.
 
-It covers the geometry pipeline, not the rendering: `popgrid()` returns cells
-as `sf` for plotting with ggplot2, where the Python package returns a
-matplotlib figure. The styled output, colour palettes, per-country
-recommended settings and detached-territory inset panels are not ported.
+popgridR stops at the geometry. `popgrid()` returns the cells as an `sf`
+data frame for you to plot, with ggplot2 or anything else. The Python
+package's styled figures, palettes, per-country settings and inset panels
+are not ported.
 
-Development version, not on CRAN. See Limitations below.
+It is a development version and not on CRAN.
 
 ## Installation
 
 ```r
 devtools::install_github("gkaramanis/popgridR")
 
-# optional, for the faster C deformation backends
+# Optional. Adds the faster deformation methods written in C.
 install.packages("cartogramR")
 ```
 
@@ -36,41 +39,40 @@ library(popgridR)
 library(sf)
 library(ggplot2)
 
-# any sf polygon data frame; any numeric weight
-regions <- read_sf("regions.gpkg")   # user-supplied boundaries
+regions <- read_sf("regions.gpkg")
 
 cells <- popgrid(
   regions,
-  values     = "weight",   # column name, named vector, or per-row vector
+  values     = "weight",   # a column name, a named vector or one value per row
   region_col = "region",
-  n          = 500         # or value_per_cell = 50000
+  n          = 500         # total cells; or value_per_cell = 50000
 )
 
 ggplot(cells) +
   geom_sf(aes(fill = region), color = NA) +
   theme_void()
 
-# what one cell represents
+# What one cell stands for
 attr(cells, "value_per_cell")
-# exact cell counts per region
+
+# Cells per region
 attr(cells, "quotas")
 ```
 
-## Example: Greece population grid
+## Example: Greece
 
-Admin-1 boundaries fetched with the bundled helper (requires
-rnaturalearth); population figures from the 2021 ELSTAT census. Also in
-`inst/examples/greece.R`.
+The boundaries come from Natural Earth through `load_country_regions()`,
+which needs rnaturalearth. The population figures are from the 2021 ELSTAT
+census. The same script is in `inst/examples/greece.R`.
 
 ```r
 library(popgridR)
 library(ggplot2)
 
-# Natural Earth's admin-1 `name` column already is the 13 Greek peripheries.
+# Natural Earth's admin-1 regions for Greece are the 13 peripheries
 regions <- load_country_regions("GRC")
 
-# Mount Athos is counted separately by ELSTAT and too small to earn a cell
-# at n = 1000 - drop it for a clean 13-region map.
+# Mount Athos is too small to get a cell at n = 1000
 regions <- regions[regions$region_name != "Mount Athos", ]
 
 population <- c(
@@ -106,61 +108,64 @@ ggplot(cells) +
 
 ## Deformation methods
 
-The `method` argument selects the cartogram backend:
+`method` picks how the regions are deformed before they are filled with
+cells.
 
-| method     | backend                              | notes                                        |
-|------------|--------------------------------------|----------------------------------------------|
-| `"auto"`   | `"dcn"` if cartogramR is installed, else `"damped"` | default                     |
-| `"dcn"`    | cartogramR (Dougenik et al. 1985, C) | fast, converges fully                        |
-| `"gn"`     | cartogramR (Gastner–Newman 2004, C)  | better behaved on extreme area/weight ratios |
-| `"damped"` | built-in pure R Dougenik             | no compiled dependency; mass clamped per iteration for stability |
-| `"none"`   | pass-through                         | input geometry is used as-is                 |
+| method     | backend                                 | notes                                         |
+|------------|-----------------------------------------|-----------------------------------------------|
+| `"auto"`   | `"dcn"` with cartogramR, else `"damped"` | the default                                   |
+| `"dcn"`    | cartogramR, Dougenik et al. (1985), C   | fast and converges fully                      |
+| `"gn"`     | cartogramR, Gastner and Newman (2004), C | copes better with very uneven weights         |
+| `"damped"` | Dougenik in plain R                     | no compiled dependency, slower but stable     |
+| `"none"`   | no deformation                          | the input shapes are used as they are         |
 
-Exact per-region cell counts are enforced after rasterisation regardless of
-method, so residual area error from the deformation step does not affect
-counts, only shape.
+The method changes the shapes only. Cell counts are corrected after the
+cells are drawn, so every method gives the same counts.
 
-## Pipeline
+## What `popgrid()` does
 
-`popgrid()` runs: equal-area projection (data-centred LAEA unless `crs` is
-given) → Hamilton quotas → drop regions whose quota rounds to zero →
-landmass clustering → per landmass: scale to quota share, deform, rasterise
-→ exact quota fitting → adjacency repair against true neighbours → interior
-gap filling → re-anchor detached landmasses to the deformed mainland → snap
-all blocks to one lattice.
+1. Projects the regions to an equal-area CRS (Lambert azimuthal centred on
+   the data, unless you pass `crs`).
+2. Allocates cells to regions and drops those that get none.
+3. Groups the regions into landmasses.
+4. For each landmass, scales and deforms the regions and fills them with
+   cells.
+5. Adds or removes cells until every region has its exact count.
+6. Moves cells so that regions border the same neighbours as on the real
+   map, and fills gaps inside the mosaic.
+7. Places detached landmasses next to the mainland and puts all cells on
+   one grid.
 
-Every step is exported (`project_regions()`, `detect_landmasses()`,
-`deform_regions()`, `generate_cells()`, `fit_quota()`,
-`enforce_topology()`, `fill_gaps()`) for use outside the wrapper.
+Each step is also exported on its own: `project_regions()`,
+`detect_landmasses()`, `deform_regions()`, `generate_cells()`,
+`fit_quota()`, `enforce_topology()` and `fill_gaps()`.
 
 ## Input data
 
-Any `sf` polygon data frame works. Three properties of the input affect the
-result:
+Any `sf` polygons work, but three things about them change the result.
 
-- **Geometric detail.** Runtime scales with the number of polygon parts, not
-  the number of regions. Highly detailed coastlines contribute many parts too
-  small to receive a cell; discarding them before building costs nothing
-  visually and saves a great deal of time.
-- **Rows per region.** Rows sharing a value in `region_col` pool into one
-  region, so sub-units need no dissolving. A weight held constant across a
-  region's rows is taken once rather than summed; see `values_agg`.
-- **Detached territories.** These are positioned relative to the mainland
-  rather than collected into an inset, so a distant one can sit far outside
-  the main extent. Filter it out beforehand if that is not wanted.
+Detail costs time. Runtime grows with the number of polygon parts, not the
+number of regions. Small islands and coastline fragments that are too small
+to get a cell can be dropped first without changing the map.
+
+Rows that share a value in `region_col` are treated as one region, so you
+don't need to dissolve sub-units first. If the weight is repeated on every
+row of a region, it is counted once rather than summed. See `values_agg`.
+
+Detached territories are placed next to the mainland, not in an inset. A
+far-off one can end up well outside the main map, so filter it out first if
+you don't want it.
 
 ## Limitations
 
-- **Speed on detailed geometry.** Runtime is dominated by GEOS operations
-  and scales with vertex count, not with `n`: landmass detection, adjacency
-  and deformation all slow down sharply on full-resolution boundary files.
-  Generalised boundaries are fast (Greece at `n = 1000` takes about three
-  seconds); official statistical boundaries can take minutes. `simplify =
-  TRUE` helps in that case and is not worth it otherwise.
-- **Nested enclaves.** A region fully enclosed by another constrains topology
-  repair heavily, and it may exhaust `topology_passes` without converging.
-- **`cartogramR`'s `gsm` method is not exposed**, only `dcn` and `gn`.
-- The Python original remains substantially faster on the same input.
+- Runtime depends on the number of vertices, not on `n`. Generalised
+  boundaries are quick (Greece at `n = 1000` takes about three seconds), but
+  full-resolution official boundaries can take minutes. `simplify = TRUE`
+  helps with those and isn't worth it otherwise.
+- A region enclosed by another makes the neighbour repair hard. It may use
+  up `topology_passes` without settling.
+- cartogramR's `gsm` method isn't available, only `dcn` and `gn`.
+- The Python original is much faster on the same input.
 
 ## References
 

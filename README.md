@@ -116,6 +116,7 @@ cells.
 | `"auto"`   | `"dcn"` with cartogramR, else `"damped"` | the default                                   |
 | `"dcn"`    | cartogramR, Dougenik et al. (1985), C   | fast and converges fully                      |
 | `"gn"`     | cartogramR, Gastner and Newman (2004), C | copes better with very uneven weights         |
+| `"gsm"`    | cartogramR, Gastner, Seguy and More (2018), C | flow-based successor to `"gn"`, faster |
 | `"damped"` | Dougenik in plain R                     | no compiled dependency, slower but stable     |
 | `"none"`   | no deformation                          | the input shapes are used as they are         |
 
@@ -164,7 +165,6 @@ you don't want it.
   helps with those and isn't worth it otherwise.
 - A region enclosed by another makes the neighbour repair hard. It may use
   up `topology_passes` without settling.
-- cartogramR's `gsm` method isn't available, only `dcn` and `gn`.
 - The Python original is much faster on the same input.
 
 ## References
@@ -174,6 +174,9 @@ you don't want it.
   37(1), 75–81.
 - Gastner, M. T., & Newman, M. E. J. (2004). Diffusion-based method for
   producing density-equalizing maps. *PNAS*, 101(20), 7499–7504.
+- Gastner, M. T., Seguy, V., & More, P. (2018). Fast flow-based algorithm
+  for creating density-equalizing map projections. *PNAS*, 115(10),
+  E2156–E2164.
 - Original Python implementation:
   [databites-tech/popgrid](https://github.com/databites-tech/popgrid) by
   [Josep Ferrer](https://github.com/iamjosepferrer).

@@ -112,3 +112,15 @@ test_that("method = none tiles undeformed geometry", {
                    n = 40L, method = "none", verbose = FALSE)
   expect_equal(sum(table(cells$region_name)), 40L)
 })
+
+test_that("method = \"gsm\" deforms areas towards the weights", {
+  skip_if_not_installed("cartogramR")
+  r <- function(x0) sf::st_polygon(list(cbind(c(x0, x0 + 1, x0 + 1, x0, x0) * 1e5,
+                                              c(0, 0, 1e5, 1e5, 0))))
+  regions <- sf::st_sf(name = c("A", "B", "C", "D"),
+                       geometry = sf::st_sfc(lapply(0:3, r), crs = 3857))
+  out <- deform_regions(regions, c(40, 30, 20, 10), method = "gsm", verbose = FALSE)
+  share <- as.numeric(sf::st_area(out))
+  share <- share / sum(share)
+  expect_equal(share, c(0.4, 0.3, 0.2, 0.1), tolerance = 0.02)
+})

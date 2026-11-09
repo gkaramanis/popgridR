@@ -11,7 +11,7 @@ popgrid(
   n = 1000L,
   value_per_cell = NULL,
   values_agg = c("auto", "sum", "first"),
-  method = c("auto", "dcn", "gn", "damped", "none"),
+  method = c("auto", "dcn", "gn", "gsm", "damped", "none"),
   crs = NULL,
   cluster_distance_m = 2e+05,
   simplify = FALSE,
@@ -74,7 +74,7 @@ cell losses. Default 1.18.}
 \code{\link[=dougenik_cartogram]{dougenik_cartogram()}}.}
 
 \item{deform_options}{Named list forwarded to
-\code{cartogramR::cartogramR(options = )} for \code{method = "dcn"}/\code{"gn"}.}
+\code{cartogramR::cartogramR(options = )} for \code{method = "dcn"}, \code{"gn"} or \code{"gsm"}.}
 
 \item{topology_passes}{Maximum repair passes in \code{\link[=enforce_topology]{enforce_topology()}}.}
 

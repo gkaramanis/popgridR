@@ -7,7 +7,7 @@
 deform_regions(
   gdf,
   values,
-  method = c("auto", "dcn", "gn", "damped", "none"),
+  method = c("auto", "dcn", "gn", "gsm", "damped", "none"),
   iterations = 20L,
   max_step_fraction = 0.35,
   options = NULL,
@@ -19,13 +19,15 @@ deform_regions(
 
 \item{values}{Numeric vector of weights, one per row of \code{gdf}.}
 
-\item{method}{One of \code{"auto"}, \code{"dcn"}, \code{"gn"}, \code{"damped"}, \code{"none"}.}
+\item{method}{One of \code{"auto"}, \code{"dcn"}, \code{"gn"}, \code{"gsm"}, \code{"damped"},
+\code{"none"}. \code{"gn"} is Gastner and Newman's diffusion method and \code{"gsm"} its
+faster flow-based successor (Gastner, Seguy and More 2018).}
 
 \item{iterations, max_step_fraction}{Passed to \code{\link[=dougenik_cartogram]{dougenik_cartogram()}}
 (\code{"damped"} method only).}
 
 \item{options}{Named list passed to \code{cartogramR::cartogramR()}'s \code{options}
-argument (\code{"dcn"}/\code{"gn"} only).}
+argument (\code{"dcn"}, \code{"gn"} and \code{"gsm"} only).}
 
 \item{verbose}{Print progress messages.}
 }
@@ -33,8 +35,8 @@ argument (\code{"dcn"}/\code{"gn"} only).}
 Copy of \code{gdf} with deformed geometries.
 }
 \description{
-Dispatcher over the available cartogram implementations. \code{"dcn"} and
-\code{"gn"} require the suggested \pkg{cartogramR} package; \code{"damped"} is the
+Dispatcher over the available cartogram implementations. \code{"dcn"}, \code{"gn"}
+and \code{"gsm"} require the suggested \pkg{cartogramR} package; \code{"damped"} is the
 built-in pure-R fallback; \code{"none"} returns the input unchanged. \code{"auto"}
 picks \code{"dcn"} when \pkg{cartogramR} is installed, else \code{"damped"}.
 }

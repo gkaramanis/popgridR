@@ -17,7 +17,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Georgios Karamanis \email{claude@karaman.is}
+\strong{Maintainer}: Georgios Karamanis \email{georgios.karamanis@me.com}
 
 }
 \keyword{internal}

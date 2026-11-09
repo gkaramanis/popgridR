@@ -2,7 +2,7 @@ Package: popgridR
 Title: Mosaic Cartograms from Arbitrary Boundaries and Weights
 Version: 0.0.0.9000
 Authors@R:
-    person("Georgios", "Karamanis", , "claude@karaman.is", role = c("aut", "cre"))
+    person("Georgios", "Karamanis", , "georgios.karamanis@me.com", role = c("aut", "cre"))
 Description: Generate mosaic (block) cartograms: a set of regions is
     deformed so that area is proportional to a numeric weight, then
     rasterised into equal-area square cells, with each region receiving a

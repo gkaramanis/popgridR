@@ -1,27 +1,16 @@
 # popgridR
 
-popgridR draws mosaic cartograms: maps made of equal squares, where each
-region gets as many squares as its weight calls for. A region with twice the
-population gets twice the squares, and every square stands for the same
-amount (people, trips, euros).
+popgridR draws mosaic cartograms, maps of equal squares where every square
+stands for the same amount (people, trips, euros). Regions are deformed to
+match their weights and then filled with cells. Hamilton allocation fixes
+each region's cell count in advance, so the counts are exact even when the
+shapes are not. `popgrid()` returns the cells as `sf` for you to plot.
 
-It works in two steps. First the regions are deformed so their areas match
-their weights, then they are filled with square cells. The number of cells
-per region is fixed in advance with Hamilton (largest-remainder) allocation,
-so the counts are exact even when the shapes are not.
-
-It is an R port of [popgrid](https://github.com/databites-tech/popgrid), a
-Python package by [Josep Ferrer](https://github.com/iamjosepferrer). The
-Python version takes a country code and uses its own population data. This
-one takes any `sf` polygons and any numeric column. I wrote the port largely
-with Claude Code.
-
-popgridR stops at the geometry. `popgrid()` returns the cells as an `sf`
-data frame for you to plot, with ggplot2 or anything else. The Python
-package's styled figures, palettes, per-country settings and inset panels
-are not ported.
-
-It is a development version and not on CRAN.
+It is an R port of [popgrid](https://github.com/databites-tech/popgrid) by
+[Josep Ferrer](https://github.com/iamjosepferrer), written largely with
+Claude Code. It takes any `sf` polygons and numeric weights instead of
+country codes, and leaves out the Python package's plotting. It is a
+development version, not on CRAN.
 
 ## Installation
 
@@ -125,37 +114,21 @@ cells are drawn, so every method gives the same counts.
 
 ## What `popgrid()` does
 
-1. Projects the regions to an equal-area CRS (Lambert azimuthal centred on
-   the data, unless you pass `crs`).
-2. Allocates cells to regions and drops those that get none.
-3. Groups the regions into landmasses.
-4. For each landmass, scales and deforms the regions and fills them with
-   cells.
-5. Adds or removes cells until every region has its exact count.
-6. Moves cells so that regions border the same neighbours as on the real
-   map, and fills gaps inside the mosaic.
-7. Places detached landmasses next to the mainland and puts all cells on
-   one grid.
-
-Each step is also exported on its own: `project_regions()`,
-`detect_landmasses()`, `deform_regions()`, `generate_cells()`,
-`fit_quota()`, `enforce_topology()` and `fill_gaps()`.
+It projects the regions to an equal-area CRS, allocates cells, groups the
+regions into landmasses, then deforms and fills each landmass. It then
+corrects the counts, repairs neighbours so regions touch as on the real map,
+fills gaps and puts all cells on one grid. Each step is exported:
+`project_regions()`, `detect_landmasses()`, `deform_regions()`,
+`generate_cells()`, `fit_quota()`, `enforce_topology()` and `fill_gaps()`.
 
 ## Input data
 
-Any `sf` polygons work, but three things about them change the result.
-
-Detail costs time. Runtime grows with the number of polygon parts, not the
-number of regions. Small islands and coastline fragments that are too small
-to get a cell can be dropped first without changing the map.
-
-Rows that share a value in `region_col` are treated as one region, so you
-don't need to dissolve sub-units first. If the weight is repeated on every
-row of a region, it is counted once rather than summed. See `values_agg`.
-
-Detached territories are placed next to the mainland, not in an inset. A
-far-off one can end up well outside the main map, so filter it out first if
-you don't want it.
+- Runtime grows with the number of polygon parts. Drop islands too small to
+  get a cell first.
+- Rows sharing a `region_col` value form one region. See `values_agg` for
+  how weights are combined.
+- Detached territories sit next to the mainland, not in an inset. Filter
+  out far-off ones you don't want.
 
 ## Limitations
 
